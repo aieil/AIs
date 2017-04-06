@@ -23,7 +23,7 @@ usage: ann <option> <source> (wts_source) [output]
     or overwritten if it does. If no file is specified, results will be
     written to stdout
 
-    (source_2) should only be specified when it is needed
+    (wts_source) should only be specified when it is needed
 
     --help  show help
 
