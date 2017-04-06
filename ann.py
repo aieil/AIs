@@ -1,6 +1,7 @@
 import numpy as np
 import random as r
 import math as m
+import pickle as p
 from sys import argv
 
 # predictable seed
@@ -18,6 +19,8 @@ bits = 4
 # global usage!!
 usage = """
 usage: ann <option> <source> (wts_source) [output]
+
+    Runs in Python 3
 
     [output] is a local file name, it will be created if it does not exist
     or overwritten if it does. If no file is specified, results will be
@@ -81,16 +84,25 @@ class sig_neur:
 # returns a list of layers of neurons equal to the integer at each index
 # sets the number of weights on the first layer = n_inps
 # random initialization
-def network(layers, n_inps, adj_rt):
+def network(layers, n_inps, wts=None):
+    global adj_rt
     global mid
+
     network = [0 for _ in layers]
     rand_wts = lambda layer: [2 * r.random() - 1 for n in layer]
-    network[0] = [sig_neur(rand_wts(n_inps * [0]), adj_rt, mid) \
-            for _ in range(layers[0])]
+
+    if wts:
+        network[0] = [sig_neur(w, adj_rt, mid) for w in wts[0]]
+    else:
+        network[0] = [sig_neur(rand_wts(n_inps * [0]), adj_rt, mid) \
+                for _ in range(layers[0])]
+
     i = 1
-    
     while i < len(layers):
-        network[i] = [sig_neur(rand_wts(network[i-1]), adj_rt, mid) \
+        if wts:
+            network[i] = [sig_neur(w, adj_rt, mid) for w in wts[i]]
+        else:
+            network[i] = [sig_neur(rand_wts(network[i-1]), adj_rt, mid) \
                 for _ in range(layers[i])]
         i += 1
 
@@ -190,41 +202,83 @@ def identify(light):
 
 
 # runs backpropagation on all the lines in the test set
-def train(network, targets_list):
+def train(network, light_data):
     global mid
-    for t in targets_list:
-        outputs = int_to_arr(arr_to_int(feed_forward(net, t)))
-        targets = int_to_arr(identify(t))
+    for l in light_data:
+        outputs = int_to_arr(arr_to_int(feed_forward(network, l)))
+        targets = int_to_arr(identify(l))
         backpropagate(outputs, targets, network)
 
 
 
 # outputs a feed forward of all the lines in the test set
-def test(network, targets_list):
+def test(network, light_data):
     global mid
     outputs_list = []
-    for t in targets_list:
-        outputs_list.append(arr_to_int(feed_forward(network, t), mid))
+    for l in light_data:
+        outputs_list.append(arr_to_int(feed_forward(network, l)))
     return outputs_list
 
 
 
 # assuming a fit is possible, keeps training until we have a fit
-def fit(training_set, network):
-    f = open(training_set, 'r')
-    light_data = f.readlines()
-    f.close()
-    light_data = [[int(e) for e in line if e in ('1', '0')] for line in light_data]
+def fit(light_data, network):
     targets_list = [identify(l) for l in light_data]
-
-    outputs_list = test(network, targets_list)
+    outputs_list = test(network, light_data)
     i = 0
-    while outputs_list != targets_list:
+    while not np.array_equal(outputs_list, targets_list):
         i += 1
-        train(network, targets_list)
-        outputs_list = test(network, targets_list)
+        train(network, light_data)
+        outputs_list = test(network, light_data)
 
     print("fit target in {} iterations".format(i))
+
+
+
+# reads target data from a file
+def read_targets(trgs_file):
+    f = open(trgs_file, 'r')
+    light_data = f.readlines()
+    f.close()
+    light_data = [[int(e) for e in line if e in ('1', '0')] for line in light_data \
+            if line != '\n']
+    return light_data
+
+
+
+# puts weights in a pickle
+def write_wts(wts_file, network):
+    wts = [[neuron.wts for neuron in layer] for layer in network]
+    if wts_file:
+        f = open(wts_file, 'wb')
+        p.dump(wts, f)
+        f.close()
+    else:
+        print(wts)
+
+
+
+# unpickles a weights file
+def read_wts(wts_file):
+    f = open(wts_file, 'rb')
+    wts = p.load(f)
+    f.close()
+
+    return wts
+
+
+
+# writes out test output
+def write_test(test_file, outputs_list):
+    if (test_file): f = open(test_file, 'r')
+    
+    for output in outputs_list:
+        if test_file:
+            f.writeline('[{}]\n'.format(output))
+        else:
+            print('[{}]\n'.format(output))
+    
+    if (test_file): f.close()
 
 
 
@@ -232,16 +286,27 @@ def main():
     n_features = 8 # eight possible corner configurations
     # a common rule of thumb is features^2 neurons on the hidden layer
     # this is simple enough that I don't think I need that many so I'm doing half
-    n_hidden = n_features ** 2 / 2
+    n_hidden = n_features ** 2 // 2
     n_lights = 7 # number of light thingies in display
-    global mid
-    global adj_rt
     global bits
 
     if len(argv) > 1:
         if (argv[1] == "--train"):
-            net = network([n_features, n_hidden, bits], n_lights, adj_rt, mid)
-            fit(argv[2], net)
+            net = network([n_features, bits], n_lights)
+            fit(read_targets(argv[2]), net)
+
+            if len(argv) > 3: write_wts(argv[3], net)
+            else: write_wts(None, net)
+        
+        elif (argv[1] == "--test"):
+            wts = read_wts(argv[2])
+            net = network([n_features, bits], n_lights, wts)
+            light_data = read_targets(argv[3])
+            outputs_list = test(net, light_data)
+
+            if len(argv) > 4: write_test(argv[4], outputs_list)
+            else: write_test(None, outputs_list)
+
         else:
             print(usage)
             return
