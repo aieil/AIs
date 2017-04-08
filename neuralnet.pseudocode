@@ -1,0 +1,46 @@
+/* I wrote this for my own benefit because lengthy explanations of derivatives
+ * are not my strong suit. The math behind ANNs is actually pretty easy
+ * no need to worry.
+ */
+
+
+class neuron:
+    contains sigmoidal function sig
+    activate(inputs) := 
+        // save for later
+        this.last_output := sig(dot_product(weights, inputs))
+        return this.last_output
+
+    adjustment(error) :=
+        // delta
+        adjustor := error * this.last_output * (1 - this.last_output)
+
+        // w[i] = w[i] - eta * delta * x[i]
+        for i := 1..n_weights:
+            weights[i] -= learning_rate * adjustor * input[i]
+        
+        // delta * w[i] for backpropagation
+        return [adjustor * weight for all weights]
+
+
+backpropagate(outputs, targets, network) :=
+    errors := []
+
+    // output layer error function is (output - target)
+    for j := 1..n_neurons_in_output_layer:
+        network[n_layers, j].adjustment(outputs[j] - targets[j]) -> errors // push to list
+
+    // backpropagating errors is sum of past errors attributable to current neuron
+    for i := (n_layers-1)..1:
+        new_errors := []
+        for j := 1..n_neurons_in_layer:
+            sum_errors := 0
+            // every neuron on the previous layer has a list of delta * w[i]
+            // values by neuron; take every neuron on the last layer and locate its
+            // delta * w[i] value corresponding to the current neuron, sum them
+            // (just takes the column sum of the error matrix at j)
+            for k := 1..n_neurons_in_next_layer:
+                sum_errors += errors[j, k]
+        network[i, j].adjustment(sum_errors) -> new_errors
+
+    errors := new_errors

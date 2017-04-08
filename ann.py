@@ -5,7 +5,7 @@ import pickle as p
 from sys import argv
 
 # predictable seed
-r.seed("The quick brown fox jumped over the yellow dog")
+r.seed("YOU MUST CONSTRUCT MORE PYLONS")
 
 # global rate
 adj_rt = 0.5
@@ -205,7 +205,7 @@ def identify(light):
 def train(network, light_data):
     global mid
     for l in light_data:
-        outputs = int_to_arr(arr_to_int(feed_forward(network, l)))
+        outputs = feed_forward(network, l)
         targets = int_to_arr(identify(l))
         backpropagate(outputs, targets, network)
 
@@ -270,13 +270,13 @@ def read_wts(wts_file):
 
 # writes out test output
 def write_test(test_file, outputs_list):
-    if (test_file): f = open(test_file, 'r')
+    if (test_file): f = open(test_file, 'w')
     
     for output in outputs_list:
         if test_file:
-            f.writeline('[{}]\n'.format(output))
+            f.write(f'[{output}]\n\n')
         else:
-            print('[{}]\n'.format(output))
+            print(f'[{output}]\n\n')
     
     if (test_file): f.close()
 
@@ -286,7 +286,8 @@ def main():
     n_features = 8 # eight possible corner configurations
     # a common rule of thumb is features^2 neurons on the hidden layer
     # this is simple enough that I don't think I need that many so I'm doing half
-    n_hidden = n_features ** 2 // 2
+    n_hidden = n_features ** 2 // 2 # the addition of the hidden layer actually hurt performance so I'm
+                                    # removing it
     n_lights = 7 # number of light thingies in display
     global bits
 
@@ -311,7 +312,11 @@ def main():
             print(usage)
             return
     else:
-        print(usage)
+        wts = read_wts("wts.pickle")
+        net = network([n_features, bits], n_lights, wts)
+        light_data = read_targets("in.txt")
+        outputs_list = test(net, light_data)
+        write_test("out.txt", outputs_list)
         return
 
 
